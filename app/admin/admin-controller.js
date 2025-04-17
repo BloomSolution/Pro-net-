@@ -123,6 +123,7 @@ exports.getAdmin = async (req, res) => {
 };
 //Get a admin END
 
+
 // Edit password START
 exports.editAdminPassword = async (req, res) => {
   try {
@@ -162,10 +163,15 @@ exports.editAdminPassword = async (req, res) => {
 exports.updateAdminData = async (req, res) => {
     try {
         let { admin_id } = req.params;
-        const { name, email,password } = req.body;
+        const { name,email,password } = req.body;
           
         if (email && !validator.validate(email)) {
             return res.status(400).json({ Status: false, message: 'Email is not valid' });
+        }
+
+        const existingAdmin = await adminService.adminFindAccount(email);
+        if (existingAdmin) {
+            return res.status(400).json({ Status: false, message: 'This email already exists' });
         }
 
         let hashedPassword;

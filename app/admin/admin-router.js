@@ -15,8 +15,8 @@ route.get('/getAdmin/:admin_id',VerifyJwtToken,adminController.getAdmin);
 //edit admin Password 
 route.patch('/editAdminPassword/:admin_id',VerifyJwtToken,adminController.editAdminPassword);
 //edit admin Profile
-
-//Delete admin profile
-
+route.put('/updateAdminData/:admin_id',VerifyJwtToken,adminController.updateAdminData);
+//Delete a admin 
+route.delete('/deleteAdminAccount/:admin_id',VerifyJwtToken,adminController.deleteAdminData);
 
 module.exports = route; 

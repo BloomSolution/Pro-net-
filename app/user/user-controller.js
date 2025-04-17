@@ -121,7 +121,6 @@ exports.getUser = async (req, res) => {
 };
 //Get a user END
 
-
 //visitor START
 exports.trackVisitor = async (req, res) => {
   try {
@@ -149,8 +148,6 @@ exports.trackVisitor = async (req, res) => {
 };
 //visitor END
 
-
-
 // Edit password of user START
 exports.editUserPassword = async (req, res) => {
   try {
@@ -168,7 +165,7 @@ exports.editUserPassword = async (req, res) => {
     }
 
     // Compare old password with hashed password
-    const isMatch = await bcrypt.compare(oldPassword, admin.password);
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Old password is incorrect' });
     }
@@ -185,3 +182,61 @@ exports.editUserPassword = async (req, res) => {
   }
 };
 //Edit password of user END
+
+//Update user START
+exports.updateUserData = async (req, res) => {
+    try {
+        let { user_id } = req.params;
+        const { email,password } = req.body;
+          
+        if (email && !validator.validate(email)) {
+            return res.status(400).json({ Status: false, message: 'Email is not valid' });
+        }
+
+        const existingUser = await userService.findAccount(email);
+        if (existingUser) {
+            return res.status(400).json({ Status: false, message: 'This email already exists' });
+        }
+
+        let hashedPassword;
+        if (password) {
+            hashedPassword = await bcrypt.hash(password, 10);
+        }
+
+        const data1 = {          
+            email: email || undefined,
+            password: hashedPassword || undefined,           
+        };
+
+        const result = await userService.updateUserInfo(user_id, data1);
+
+        if (result.Status === true) {
+            let updateData = result.result;
+            return res.status(200).json({ Status: true, message: 'Updated successfully!', updateData });
+        } else {
+            return res.status(200).json(result);
+        }
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ Status: false, message: err.message });
+    }
+};
+//Update user END
+
+//Delete user START
+exports.deleteUserData = async (req, res) =>{
+    try {
+        let { user_id } = req.params
+        let data = await userService.findAndDeleteUserAccount(user_id)
+        if (data) {
+            console.log("Delete User Data ", data)
+            return res.status(200).json({ Status: true, message: 'Account delete successfully', data })
+        } else {
+            return res.status(404).send({ Status: false, message: 'Not Found Admin Account' })
+        }
+    } catch (err) {
+        console.log("Delete account error", err);
+        return res.status(400).json({ Status: false, message: 'sorry! somthing went wrong' })
+    }  
+}
+//Delete user END

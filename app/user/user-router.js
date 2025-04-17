@@ -17,8 +17,8 @@ route.get('/visit',VerifyJwtToken,userController.trackVisitor);
 //edit user Password 
 route.patch('/editUserPassword/:user_id',VerifyJwtToken,userController.editUserPassword);
 //edit user Profile
-
-//Delete user profile
-
+route.put('/updateUserData/:user_id',VerifyJwtToken,userController.updateUserData);
+//Delete a user 
+route.delete('/deleteUserAccount/:user_id',VerifyJwtToken,userController.deleteUserData);
 
 module.exports = route; 

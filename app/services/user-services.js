@@ -46,8 +46,8 @@ async getAllUserDetails() {
     console.log('Get task service err', err);
     throw new Error()
     }
-  }
-  //Read all users information END
+}
+//Read all users information END
 
 //Read a user information END
 async findAndGetUserAccount(user_id) {
@@ -65,6 +65,27 @@ async findAndGetUserAccount(user_id) {
 }
 //Read a user information END
 
+ //Update user info SRART
+ async updateUserInfo(id,data) {
+    try {
+        let result = await users.findByIdAndUpdate(id,{$set:data},{new:true})
+        return {Status:true,result}
+    } catch (err) {
+        console.log('Update admin service ', err);
+    throw err
+    }
+}
+//Update user info END
+
+//find and delete user account START
+async findAndDeleteUserAccount(id) {
+    try {
+    return await users.findByIdAndDelete(id, { $set: { active: false } }, { new: true })
+    } catch (err) {
+    throw err
+    }
+}
+//find and delete user account END
 
 }
 module.exports = new userServie();
