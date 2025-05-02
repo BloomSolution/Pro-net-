@@ -6,12 +6,11 @@ const visitorCountSchema = new Schema({
         type: String,
         unique: true,
         required: true
-      },
-      visitedAt: {
+    },
+    visitedAt: {
         type: Date,
         default: Date.now
-      }
-});
-
+    }
+}, { timestamps: true });
 
 module.exports = mongoose.model('VisitorCount', visitorCountSchema, 'VisitorCounts');

@@ -18,5 +18,18 @@ route.patch('/editAdminPassword/:admin_id',VerifyJwtToken,adminController.editAd
 route.put('/updateAdminData/:admin_id',VerifyJwtToken,adminController.updateAdminData);
 //Delete a admin 
 route.delete('/deleteAdminAccount/:admin_id',VerifyJwtToken,adminController.deleteAdminData);
+//Activate User
+route.post('/activateAffiliate/:admin_id',VerifyJwtToken,adminController.activateAffiliate);
+//Inactivate user by Admin
+route.put('/inactivateUserByAdmin/:admin_id/:user_id',VerifyJwtToken,adminController.inactivateUserByAdmin);
+// Get all tickets
+route.get('/getAllTickets',adminController.getAllTickets);
+//Updates ticket status 
+route.patch('/updateTicketStatus/:ticketId', adminController.updateTicketStatus);
+
+
+//Block User by admin
+
+
 
 module.exports = route; 

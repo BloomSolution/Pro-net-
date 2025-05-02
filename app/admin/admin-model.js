@@ -14,11 +14,20 @@ const adminSchema = new Schema({
     password: {
         type: String,
         default: " "
-    },   
+    },  
+    phone_no:{
+        type: String,
+        default: " "
+    },
     tokens: [{
         type: mongoose.Schema.Types.ObjectId,
-        default: " ",
+        default:null,
         ref: 'Refresh'
+    }],
+    epins: [{
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+        ref: 'epin' 
     }],
 }, { timestamps: true })
 

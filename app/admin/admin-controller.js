@@ -4,6 +4,11 @@ const adminService = require('../services/admin-services');
 const jwtTokenService = require('../services/jwt-service');
 const refresh = require('../jwt/refresh-model');
 const bcrypt = require('bcrypt');
+const userService = require('../services/user-services');
+const users = require('../user/user-model');
+const moment = require('moment');
+const mongoose = require('mongoose');
+const Ticket = require('../models/ticket-model');
 
 //Add New admin Account START
 exports.adminRegistration = async (req, res) => {
@@ -217,3 +222,179 @@ exports.deleteAdminData = async (req, res) =>{
     }  
 }
 //Delete admin END
+
+//Activate affilite START
+exports.activateAffiliate = async (req, res) => {
+  try {
+    const { admin_id } = req.params;
+    const { user_id } = req.body;
+
+    if (!admin_id || !user_id) {
+      return res.status(400).json({ Status: false, message: "Admin ID and User ID are required." });
+    }
+
+    // Validate admin
+    const adminResponse = await adminService.findAndGetAdminAccount(admin_id);
+    if (!adminResponse.Status) {
+      return res.status(404).json({ Status: false, message: "Admin not found" });
+    }
+
+    // Subscription logic
+    const amount_of_subscription = 60;
+    const point_value = (60 * 70) / 100; // 42 PV
+    const bonus = point_value * 0.10;     // 4.2 USD
+    const today = moment().startOf('day').toDate();
+    const endDate = moment(today).add(1, 'year').toDate();
+
+    // Fetch current user
+    const user = await users.findById(user_id);
+    if (!user) {
+      return res.status(404).json({ Status: false, message: "User not found." });
+    }
+
+    const newTotalBonus = (user.total_bonus || 0) + bonus;
+
+    // Update user with $push and $set
+    const result = await users.findByIdAndUpdate(
+      user_id,
+      {
+        $set: {
+          user_status: "Active",
+          user_activate_admin_id: admin_id,
+          amount_of_subscription,
+          bonus_of_subscription: bonus,
+          total_bonus: newTotalBonus
+        },
+        $push: {
+          subscription_date: today,
+          point_value_of_subscription: point_value,
+          subscription_end_date: endDate
+        }
+      },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      Status: true,
+      message: 'User activated and subscription added successfully!',
+      updatedUser: result
+    });
+
+  } catch (err) {
+    console.log("Activate Affiliate Error:", err);
+    return res.status(500).json({ Status: false, message: 'Something went wrong', error: err.message });
+  }
+};
+//Activate affilite END
+
+//Inactivate affilite START
+exports.inactivateUserByAdmin = async (req, res) => {
+  try {
+    const { user_id, admin_id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(user_id) || !mongoose.Types.ObjectId.isValid(admin_id)) {
+      return res.status(400).json({ Status: false, message: 'Invalid user_id or admin_id' });
+    }
+
+    const userResult = await userService.findAndGetUserAccount(user_id);
+    if (!userResult || !userResult.Status || !userResult.data) {
+      return res.status(404).json({ Status: false, message: 'User not found' });
+    }
+
+    const user = userResult.data;
+
+    const now = new Date();
+    const subscriptionEndDates = user.subscription_end_date || [];
+
+    // Get the latest subscription_end_date
+    const lastEndDate = subscriptionEndDates.length > 0
+      ? new Date(subscriptionEndDates[subscriptionEndDates.length - 1])
+      : null;
+
+    if (!lastEndDate || lastEndDate >= now) {
+      return res.status(400).json({
+        Status: false,
+        message: 'User subscription is still active or subscription end date is invalid.',
+      });
+    }
+
+    const existingAdminList = Array.isArray(user.user_inActivate_admin_id)
+      ? user.user_inActivate_admin_id
+      : [];
+
+    const alreadyAdded = existingAdminList.some(id => id.toString() === admin_id);
+
+    const updatePayload = {
+      user_status: 'Inactive',
+    };
+
+    if (!alreadyAdded) {
+      updatePayload.user_inActivate_admin_id = [...existingAdminList, admin_id];
+    }
+
+    const result = await userService.updateUserInfo(user_id, updatePayload);
+
+    return res.status(200).json({
+      Status: true,
+      message: 'User successfully inactivated by admin.',
+      updatedUser: result.result,
+    });
+
+  } catch (error) {
+    console.error('Error inactivating user:', error);
+    return res.status(500).json({
+      Status: false,
+      message: 'Server error while inactivating user.',
+      error: error.message,
+    });
+  }
+}; 
+//Inactivate affilite END
+
+
+// Get all tickets START
+exports.getAllTickets = async (req, res) => {
+  try {
+    const tickets = await Ticket.find() 
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, tickets });
+  } catch (error) {
+    console.error('Error fetching tickets:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+//Get all tickets END
+
+//Updates ticket status START
+exports.updateTicketStatus = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { status } = req.body;
+
+    if (!['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    const updatedTicket = await Ticket.findByIdAndUpdate(
+      ticketId,
+      { status },
+      { new: true }
+    );
+
+    if (!updatedTicket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    res.status(200).json({ success: true, message: 'Status updated', ticket: updatedTicket });
+  } catch (error) {
+    console.error('Error updating ticket status:', error.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+//Updates ticket status END
+
+
+//Block affilite START
+
+//Block affilite END

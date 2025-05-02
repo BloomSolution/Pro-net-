@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Socket.IO Chat UI</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        #messages { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll; }
+    </style>
+</head>
+<body>
+    <h2>Chat UI</h2>
+    <input type="text" id="userId" placeholder="Enter Your User ID" />
+    <input type="text" id="receiverId" placeholder="Receiver ID" />
+    <br><br>
+    <div id="messages"></div>
+    <br>
+    <input type="text" id="messageInput" placeholder="Type a message" />
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        const socket = io();
+
+        document.getElementById('userId').addEventListener('blur', () => {
+            const userId = document.getElementById('userId').value;
+            if (userId) {
+                socket.emit('join', { userId });
+            }
+        });
+
+        function sendMessage() {
+            const senderId = document.getElementById('userId').value;
+            const receiverId = document.getElementById('receiverId').value;
+            const message = document.getElementById('messageInput').value;
+
+            socket.emit('sendMessage', { senderId, receiverId, message });
+            addMessage(`You: ${message}`);
+            document.getElementById('messageInput').value = '';
+        }
+
+        socket.on('receiveMessage', (data) => {
+            addMessage(`Message from ${data.senderId}: ${data.message}`);
+        });
+
+        function addMessage(msg) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.textContent = msg;
+            messages.appendChild(div);
+        }
+    </script>
+</body>
+</html>

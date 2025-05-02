@@ -1,4 +1,6 @@
 const users = require('../user/user-model');
+const wallet = require('../models/user-wallet-model');
+const tokenService = require('./jwt-service');
 
 class userServie {
 
@@ -86,6 +88,48 @@ async findAndDeleteUserAccount(id) {
     }
 }
 //find and delete user account END
+
+// Create user wallet SRART
+async createUserWallet(data) {
+    try {
+      const result = await wallet.create(data);  
+      if (result) {
+        await users.findByIdAndUpdate(result.user_id, {$set: { wallet_info: result._id }});
+        const populated = await wallet.findById(result._id).populate({path: 'user_id',model: 'usermaster'});  
+        return { Status: true, data: populated };
+      }
+    } catch (err) {
+      console.log('createUserWallet service error', err);
+      throw err;
+    }
+  }  
+//Create user wallet END
+
+//Find user details by token START
+async finduserAccountdetails(token) {
+    try {
+      const decodedToken = tokenService.verifyAccessToken(token);
+  
+      if (!decodedToken || !decodedToken.user_id) {
+        throw new Error('Invalid token');
+      }
+  
+      const user = await users.findById(decodedToken.user_id)
+        .populate({
+          path: 'tokens',
+          model: 'Refresh',
+          select:'-createdAt -updatedAt -tokens -usermasters -password -__v'
+        })
+        .select('-createdAt -updatedAt -tokens -password -__v') 
+        .exec();
+  
+      return user;
+    } catch (err) {
+      console.log('service error', err);
+      throw err;
+    }
+  }
+//Find user details by token END
 
 }
 module.exports = new userServie();
