@@ -73,7 +73,22 @@ const userSchema = new Schema({
     }, 
     user_status:{
         type: String,
-        default: "Inactive"
+        default: ""
+    },
+    user_profile_img:{
+        type:String,
+        default:" ",   
+        set:(file)=>{
+            if(file){
+                return file  
+            }
+            return ;
+        },              
+    },
+    user_referral_code:{
+        type: String,
+        default: "",
+        unique: true
     },
     subscription_date:[{
                         type: Date,

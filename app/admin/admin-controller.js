@@ -168,7 +168,8 @@ exports.editAdminPassword = async (req, res) => {
 exports.updateAdminData = async (req, res) => {
     try {
         let { admin_id } = req.params;
-        const { name,email,password } = req.body;
+        const { name,email,password,phone_no } = req.body;
+        const filename = req.file.filename;
           
         if (email && !validator.validate(email)) {
             return res.status(400).json({ Status: false, message: 'Email is not valid' });
@@ -187,7 +188,9 @@ exports.updateAdminData = async (req, res) => {
         const data1 = {
             name: name || undefined,
             email: email || undefined,
-            password: hashedPassword || undefined,           
+            password: hashedPassword || undefined, 
+            phone_no:phone_no||undefined, 
+            profile_img: filename || undefined          
         };
 
         const result = await adminService.updateAdminInfo(admin_id, data1);

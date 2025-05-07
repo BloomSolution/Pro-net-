@@ -15,10 +15,11 @@ if (!dbURI) {
 const connectDB = async () => {
     try {
         await mongoose.connect(dbURI, {
-            useNewUrlParser: true,
+            //useNewUrlParser: true,
             //useUnifiedTopology: true,
             connectTimeoutMS: 80000,
             socketTimeoutMS: 80000,
+            
         });
         console.log('MongoDB Connected');
     } catch (error) {

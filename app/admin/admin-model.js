@@ -19,6 +19,16 @@ const adminSchema = new Schema({
         type: String,
         default: " "
     },
+    profile_img:{
+        type:String,
+        default:" ",   
+        set:(file)=>{
+            if(file){
+                return file  
+            }
+            return ;
+        },              
+    },
     tokens: [{
         type: mongoose.Schema.Types.ObjectId,
         default:null,

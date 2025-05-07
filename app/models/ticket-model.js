@@ -17,7 +17,7 @@ const ticketSchema = new Schema({
   },
   type: {
     type: String,
-    enum: ['technical', 'account', 'payment', 'other'],
+    enum: ['technical', 'account', 'payment','billing','products','other'],
     required: true
   },
   status: {

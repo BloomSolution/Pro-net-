@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const fileSchema = new Schema({ 
-        user: {
+        user: [{
                 type: mongoose.Schema.Types.ObjectId,
                 default:null,
                 ref: 'usermaster'
-        },
+        }],
         flyers:[{
             type:String,
             default:" ",   
@@ -37,6 +37,19 @@ const fileSchema = new Schema({
                 return ;
             },         
         },
+        video:[{
+            type:String,
+            default:" ",   
+            set:(file)=>{
+                if(file){
+                    return file  
+                }
+                return ;
+            },         
+        }],
+
+
+
         
 }, { timestamps: true });
 

@@ -22,5 +22,12 @@ const storageA = multer.diskStorage({
   })
   
 // Create multer upload instance
-const uploadFile = multer({ storage: storageA })
+const uploadFile = multer({
+  storage: storageA,
+  limits: { fileSize: 500 * 1024 * 1024 * 1024 }, //500 GB
+  fileFilter: (req, file, cb) => {
+    // You can filter files by MIME type if needed
+    cb(null, true);
+  }
+});
 module.exports = {uploadFile}

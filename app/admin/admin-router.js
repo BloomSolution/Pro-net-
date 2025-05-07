@@ -3,6 +3,7 @@ const route = express.Router()
 
 const adminController = require('./admin-controller');
 const VerifyJwtToken = require('../../app/jwt/verifyAccessToken');
+const {uploadAdminProfile} =require('../middleware/admin-profile-img');
 
 //Add New admin
 route.post('/adminRegistration',adminController.adminRegistration);
@@ -15,7 +16,7 @@ route.get('/getAdmin/:admin_id',VerifyJwtToken,adminController.getAdmin);
 //edit admin Password 
 route.patch('/editAdminPassword/:admin_id',VerifyJwtToken,adminController.editAdminPassword);
 //edit admin Profile
-route.put('/updateAdminData/:admin_id',VerifyJwtToken,adminController.updateAdminData);
+route.put('/updateAdminData/:admin_id',uploadAdminProfile.single('file'),VerifyJwtToken,adminController.updateAdminData);
 //Delete a admin 
 route.delete('/deleteAdminAccount/:admin_id',VerifyJwtToken,adminController.deleteAdminData);
 //Activate User

@@ -80,6 +80,27 @@ exports.userRegistration = async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Helper function to generate referral code
+        const generateReferralCode = () => {
+          const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+          let code = 'PRONET-';
+          for (let i = 0; i < 8; i++) {
+              code += characters.charAt(Math.floor(Math.random() * characters.length));
+          }
+          return code;
+        };
+
+        // Generate a unique referral code
+        let referralCode;
+        let isUnique = false;
+        while (!isUnique) {
+            referralCode = generateReferralCode();
+            const existingCode = await users.findOne({ user_referral_code: referralCode });
+            if (!existingCode) {
+                isUnique = true;
+            }
+        }
+
         let data = {};
         data = {
             name:name,
@@ -92,7 +113,8 @@ exports.userRegistration = async (req, res) => {
             dob:dob,
             state:state,
             city:city,
-            aadhar_no:aadhar_no
+            aadhar_no:aadhar_no,
+            user_referral_code: referralCode
         };
       
         const response = await userService.createAccount(data);
@@ -262,7 +284,8 @@ exports.editUserPassword = async (req, res) => {
 exports.updateUserData = async (req, res) => {
     try {
         let { user_id } = req.params;
-        const { name,user_address,email,password } = req.body;
+        const { name,user_address,email,password,phone_no,age,gender,dob,state,city,aadhar_no} = req.body;
+        const filename = req.file.filename;
           
         if (email && !validator.validate(email)) {
             return res.status(400).json({ Status: false, message: 'Email is not valid' });
@@ -282,7 +305,15 @@ exports.updateUserData = async (req, res) => {
             name:name||undefined,
             user_address:user_address||undefined,       
             email: email || undefined,
-            password: hashedPassword || undefined,           
+            password: hashedPassword || undefined,
+            phone_no:phone_no|| undefined,
+            age:age|| undefined,
+            gender:gender|| undefined,
+            dob:dob|| undefined,
+            state:state|| undefined,
+            city:city|| undefined,
+            aadhar_no:aadhar_no|| undefined,
+            user_profile_img: filename || undefined           
         };
 
         const result = await userService.updateUserInfo(user_id, data1);
@@ -465,6 +496,27 @@ exports.addNewMember = async (req, res) => {
     const capitalizedName = capitalizeWords(name);
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Helper function to generate referral code
+    const generateReferralCode = () => {
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let code = 'PRONET-';
+      for (let i = 0; i < 8; i++) {
+          code += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return code;
+    };
+
+    // Generate a unique referral code
+    let referralCode;
+    let isUnique = false;
+    while (!isUnique) {
+        referralCode = generateReferralCode();
+        const existingCode = await users.findOne({ user_referral_code: referralCode });
+        if (!existingCode) {
+            isUnique = true;
+        }
+    }
+
     const data = {
       name: capitalizedName,
       email: email,
@@ -477,7 +529,8 @@ exports.addNewMember = async (req, res) => {
       dob:dob,
       state:state,
       city:city,
-      aadhar_no:aadhar_no
+      aadhar_no:aadhar_no,
+      user_referral_code: referralCode
     };
 
     const response = await userService.createAccount(data);
@@ -552,6 +605,71 @@ exports.getMyReferrals = async (req, res) => {
 
 //Add files START 
 // flyers// ppt// agreement
+
+// exports.addFiles = async (req, res) => {
+//   try {
+//     const { userId } = req.params;
+//     if (!userId) {
+//       return res.status(400).json({ success: false, message: 'User ID is required' });
+//     }
+
+//     const flyersFiles = req.files['flyers'] || [];
+//     const pptFiles = req.files['ppt'] || [];
+//     const agreementFile = req.files['agreement'] ? req.files['agreement'][0] : null;
+//     const videoFiles = Array.isArray(req.files?.video) ? req.files.video : [];
+
+//     // Try to find if a file document already exists for the user
+//     let existingFile = await fileModel.findOne({ user: userId });
+
+//     if (existingFile) {
+//       // If file document exists, update it
+//       if (flyersFiles.length > 0) {
+//         existingFile.flyers.push(...flyersFiles.map(file => file.filename));
+//       }
+//       if (pptFiles.length > 0) {
+//         existingFile.ppt.push(...pptFiles.map(file => file.filename));
+//       }
+//       if (agreementFile) {
+//         existingFile.agreement = agreementFile.filename;
+//       }
+//       if (videoFiles.length > 0) {
+//         existingFile.video.push(...videoFiles.map((file) => file.filename));
+//       }
+
+//       console.log('Video files:', videoFiles);
+//       console.log('All Multer Files:', req.files);
+
+//       const updatedFile = await existingFile.save();
+//       return res.status(200).json({ success: true, message: 'Files updated successfully', data: updatedFile });
+
+//     } else {
+//       // If no file document exists, create a new one
+//       const data = {
+//         user: userId,
+//         flyers: flyersFiles.map(file => file.filename),
+//         ppt: pptFiles.map(file => file.filename),
+//         agreement: agreementFile ? agreementFile.filename : "",
+//         video: videoFiles.map((file) => file.filename),
+//       };
+
+//       const createdFile = await fileModel.create(data);
+
+//       // Also push the file ID into user's `files` array
+//       await users.findByIdAndUpdate(
+//         userId,
+//         { $push: { files: createdFile._id } },
+//         { new: true }
+//       );
+
+//       return res.status(201).json({ success: true, message: 'Files uploaded successfully', data: createdFile });
+//     }
+
+//   } catch (error) {
+//     console.error('Error uploading files:', error);
+//     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+//   }
+// };
+
 exports.addFiles = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -559,15 +677,18 @@ exports.addFiles = async (req, res) => {
       return res.status(400).json({ success: false, message: 'User ID is required' });
     }
 
-    const flyersFiles = req.files['flyers'] || [];
-    const pptFiles = req.files['ppt'] || [];
-    const agreementFile = req.files['agreement'] ? req.files['agreement'][0] : null;
+   const flyersFiles = Array.isArray(req.files?.flyers) ? req.files.flyers : [];
+   const pptFiles = Array.isArray(req.files?.ppt) ? req.files.ppt : [];
+   const videoFiles = Array.isArray(req.files?.video) ? req.files.video : [];
+   const agreementFile = req.files?.agreement?.[0] || null;
+   console.log("Video Files:", videoFiles);
+   console.log("agreementFile:", agreementFile);
+   console.log("Video filenames to save:", videoFiles.map(file => file.filename));
 
-    // Try to find if a file document already exists for the user
-    let existingFile = await fileModel.findOne({ user: userId });
+
+    let existingFile = await fileModel.findOne({ user: { $in: [userId] } });
 
     if (existingFile) {
-      // If file document exists, update it
       if (flyersFiles.length > 0) {
         existingFile.flyers.push(...flyersFiles.map(file => file.filename));
       }
@@ -577,25 +698,32 @@ exports.addFiles = async (req, res) => {
       if (agreementFile) {
         existingFile.agreement = agreementFile.filename;
       }
+      if (videoFiles.length > 0) {
+        existingFile.video.push(...videoFiles.map(file => file.filename));
+      }
+
+      // Optional: ensure userId is in array
+      if (!existingFile.user.includes(userId)) {
+        existingFile.user.push(userId);
+      }
 
       const updatedFile = await existingFile.save();
       return res.status(200).json({ success: true, message: 'Files updated successfully', data: updatedFile });
 
     } else {
-      // If no file document exists, create a new one
       const data = {
-        user: userId,
+        user: [userId],
         flyers: flyersFiles.map(file => file.filename),
         ppt: pptFiles.map(file => file.filename),
         agreement: agreementFile ? agreementFile.filename : "",
+        video: videoFiles.map(file => file.filename),
       };
 
       const createdFile = await fileModel.create(data);
 
-      // Also push the file ID into user's `files` array
       await users.findByIdAndUpdate(
         userId,
-        { $push: { files: createdFile._id } },
+        { $push: { files: createdFile._id } }, 
         { new: true }
       );
 
@@ -607,6 +735,7 @@ exports.addFiles = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
+
 //Add files END
 
 //Read file START
