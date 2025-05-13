@@ -7,6 +7,10 @@ const fixedBonusSchema = new Schema({
             default:null,
             ref: 'usermaster'
     },
+    fixed_bonus_percentage:{
+        type: Number,
+        default: 0
+    },
     fixed_bonus:{
         type: Number,
         default: 0

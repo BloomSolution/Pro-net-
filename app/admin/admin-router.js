@@ -24,9 +24,26 @@ route.post('/activateAffiliate/:admin_id',VerifyJwtToken,adminController.activat
 //Inactivate user by Admin
 route.put('/inactivateUserByAdmin/:admin_id/:user_id',VerifyJwtToken,adminController.inactivateUserByAdmin);
 // Get all tickets
-route.get('/getAllTickets',adminController.getAllTickets);
+route.get('/getAllTickets',VerifyJwtToken,adminController.getAllTickets);
 //Updates ticket status 
-route.patch('/updateTicketStatus/:ticketId', adminController.updateTicketStatus);
+route.patch('/updateTicketStatus/:ticketId',VerifyJwtToken,adminController.updateTicketStatus);
+//Add news
+route.post('/createNews',VerifyJwtToken,adminController.createNews);
+//Get all news
+route.get('/getAllNews',VerifyJwtToken,adminController.getAllNews);
+//Get news by user id
+route.get('/getNewsById/:id',VerifyJwtToken,adminController.getNewsById);
+//Update news
+route.patch('/updateNews/:id',adminController.updateNews);
+//Delete news
+route.delete('/deleteNews/:id',adminController.deleteNews);
+
+//
+route.get('/GetbonusStructure', adminController.getBonusStructure);
+//
+route.post('/addBonusStructure', adminController.createBonusStructure);
+//
+route.put('/bonusStructureUpdate', adminController.updateBonusStructureFlexible);
 
 
 //Block User by admin

@@ -9,6 +9,16 @@ const users = require('../user/user-model');
 const moment = require('moment');
 const mongoose = require('mongoose');
 const Ticket = require('../models/ticket-model');
+const News = require('../models/news-model');
+const Rank = require('../models/user-rank-model');
+const BonusStructure = require('../models/bonus-structure-model');
+
+const RANKS = [
+  "IGINATOR", "SPARK", "RISER", "PIONEER", "INNOVATOR", 
+  "CATALYST", "TRAILBLAZER", "VANGUARD", "LUMINARY", 
+  "MOGUL", "SOVEREIGN", "ZENITH"
+];
+
 
 //Add New admin Account START
 exports.adminRegistration = async (req, res) => {
@@ -354,7 +364,6 @@ exports.inactivateUserByAdmin = async (req, res) => {
 }; 
 //Inactivate affilite END
 
-
 // Get all tickets START
 exports.getAllTickets = async (req, res) => {
   try {
@@ -397,6 +406,225 @@ exports.updateTicketStatus = async (req, res) => {
 };
 //Updates ticket status END
 
+// Add news START
+exports.createNews = async (req, res) => {
+  try {
+    const { title, description, category, targetType, userId, rank } = req.body;
+
+    let targetUsers = [];
+
+    if (targetType === 'all') {
+      targetUsers = await users.find({}, '_id');
+    } 
+    else if (targetType === 'user' && userId) {
+      const user = await users.findById(userId);
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+      targetUsers = [user];
+    } 
+    else if ((targetType === 'rank' || targetType === 'rankAndAbove') && rank) {
+      const selectedRankIndex = RANKS.indexOf(rank.toUpperCase());
+      if (selectedRankIndex === -1) {
+        return res.status(400).json({ success: false, message: 'Invalid rank' });
+      }
+
+      const validRanks = (targetType === 'rank')
+        ? [RANKS[selectedRankIndex]]
+        : RANKS.slice(selectedRankIndex);
+
+      const rankDocs = await Rank.find({ user_rank_name: { $in: validRanks } });
+      const userIds = rankDocs.map(doc => doc.user.toString());
+
+      targetUsers = await users.find({ _id: { $in: userIds } }, '_id');
+    } 
+    else {
+      return res.status(400).json({ success: false, message: 'Invalid targetType or missing userId/rank' });
+    }
+
+    const news = await News.create({
+      title,
+      description,
+      date: new Date(),
+      category,
+      user: targetUsers.map(u => u._id)
+    });
+
+    // Optional: Save news ID to user.news field
+    await users.updateMany(
+      { _id: { $in: targetUsers.map(u => u._id) } },
+      { $push: { news: news._id } }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'News created successfully',
+      data: news
+    });
+  } catch (error) {
+    console.error('Create News Error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+//Add news END
+
+// GET all news START
+exports.getAllNews = async (req, res) => {
+  try {
+    const newsList = await News.find().populate('user', 'name email');
+    res.status(200).json({ success: true, data: newsList });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+//GET all news END
+
+// GET news by ID START
+exports.getNewsById = async (req, res) => {
+  try {
+    const news = await News.findById(req.params.id).populate('user', 'name email');
+    if (!news) {
+      return res.status(404).json({ success: false, message: 'News not found' });
+    }
+    res.status(200).json({ success: true, data: news });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+// GET news by ID END
+
+//Update news START
+exports.updateNews = async (req, res) => {
+  try {
+    const updatedNews = await News.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updatedNews) {
+      return res.status(404).json({ success: false, message: 'News not found' });
+    }
+    res.status(200).json({ success: true, message: 'News updated', data: updatedNews });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+//Update news END
+
+// DELETE news START
+exports.deleteNews = async (req, res) => {
+  try {
+    // Find the news first
+    const newsToDelete = await News.findById(req.params.id);
+    if (!newsToDelete) {
+      return res.status(404).json({ success: false, message: 'News not found' });
+    }
+
+    // Remove this news ID from all users who have it
+    await users.updateMany(
+      { news: newsToDelete._id },
+      { $pull: { news: newsToDelete._id } }
+    );
+
+    // Delete the news document itself
+    await News.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ success: true, message: 'News deleted from database and user references removed' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+//DELETE news END
+
+// CREATE or Update Bonus Structure START
+exports.createBonusStructure = async (req, res) => {
+  try {
+    const data = req.body;
+
+    let bonus = await BonusStructure.findOne();
+    if (!bonus) {
+      bonus = new BonusStructure(data);
+    } else {
+      Object.assign(bonus, data);
+    }
+
+    await bonus.save();
+    res.status(200).json({ message: 'Bonus structure saved successfully.', data: bonus });
+  } catch (err) {
+    console.error('Save Error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+//CREATE or Update Bonus Structure END
+
+// GET ALL Bonus Structure START
+exports.getBonusStructure = async (req, res) => {
+  try {
+    const data = await BonusStructure.findOne();
+    if (!data) {
+      return res.status(404).json({ message: 'Bonus structure not found.' });
+    }
+    res.status(200).json(data);
+  } catch (err) {
+    console.error('Fetch Error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+// GET ALL Bonus Structure END
+
+//Update Bonus Structure START
+exports.updateBonusStructureFlexible = async (req, res) => {
+  try {
+    const { levelName } = req.query; // optional
+    const updateData = req.body;
+
+    const bonus = await BonusStructure.findOne();
+    if (!bonus) {
+      return res.status(404).json({ message: 'Bonus structure not found' });
+    }
+
+    if (levelName) {
+      // 🔁 Update inside levelStructure
+      const index = bonus.levelStructure.findIndex(lvl => lvl.level === levelName);
+      if (index === -1) {
+        return res.status(404).json({ message: `Level '${levelName}' not found` });
+      }
+
+      bonus.levelStructure[index] = {
+        ...bonus.levelStructure[index]._doc,
+        ...updateData
+      };
+
+      await bonus.save();
+      return res.status(200).json({
+        message: `Level '${levelName}' updated successfully`,
+        data: bonus.levelStructure[index]
+      });
+    } else {
+      // 🔁 Update global values
+      const globalFields = [
+        'direct_bonus_percent',
+        'monthly_bonus_percent',
+        'jewellery_fund_percent',
+        'travel_fund_percentage',
+        'car_fund_percentage',
+        'house_fund_percentage'
+      ];
+
+      for (const key of globalFields) {
+        if (updateData[key] !== undefined) {
+          bonus[key] = updateData[key];
+        }
+      }
+
+      await bonus.save();
+      return res.status(200).json({
+        message: 'Global bonus fields updated successfully',
+        data: bonus
+      });
+    }
+  } catch (err) {
+    console.error('Flexible update error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+//Update Bonus Structure END
 
 //Block affilite START
 

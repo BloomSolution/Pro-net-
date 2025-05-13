@@ -17,6 +17,10 @@ const { v4: uuidv4 } = require('uuid');
 const Epin = require('../models/epin-model'); 
 const admins = require('../admin/admin-model');
 const nodemailer = require('nodemailer'); //email
+const rankModel = require('../models/user-rank-model');
+
+
+
 
 //Send mail body START   //fun
 async function sendWelcomeEmail(email, name) {
@@ -285,7 +289,8 @@ exports.updateUserData = async (req, res) => {
     try {
         let { user_id } = req.params;
         const { name,user_address,email,password,phone_no,age,gender,dob,state,city,aadhar_no} = req.body;
-        const filename = req.file.filename;
+        // const filename = req.file.filename;
+        const filename = req.file?.filename || undefined;
           
         if (email && !validator.validate(email)) {
             return res.status(400).json({ Status: false, message: 'Email is not valid' });
@@ -313,7 +318,7 @@ exports.updateUserData = async (req, res) => {
             state:state|| undefined,
             city:city|| undefined,
             aadhar_no:aadhar_no|| undefined,
-            user_profile_img: filename || undefined           
+            user_profile_img: filename      
         };
 
         const result = await userService.updateUserInfo(user_id, data1);
@@ -571,6 +576,126 @@ exports.addNewMember = async (req, res) => {
 };
 //Add direct by User END
 
+//Add direct by User referal code START
+exports.addNewMemberWithCode = async (req, res) => {
+  try {
+    const { referral_code, name, email, user_address, password, phone_no, age, gender, dob, state, city, aadhar_no } = req.body;
+
+    let referringUser = null;
+    if (referral_code) {
+      referringUser = await users.findOne({ user_referral_code: referral_code });
+      if (!referringUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'Invalid referral code.',
+        });
+      }
+      console.log("Referred user", referringUser);
+    }
+
+    if (!name || !email || !password) {
+      return res.status(406).json({
+        Status: false,
+        message: 'Name, email, and password are required fields!',
+      });
+    }
+
+    if (!validator.validate(email)) {
+      return res.status(400).json({ Status: false, message: 'Email is not valid' });
+    }
+
+    const existingUser = await userService.findAccount(email);
+    if (existingUser) {
+      return res.status(400).json({ Status: false, message: 'This email already exists' });
+    }
+
+    const userPhoneNo = await users.findOne({ phone_no: phone_no }).exec();
+    if (userPhoneNo) {
+      return res.status(400).json({ Status: false, message: 'This user phone number already exists' });
+    }
+
+    const capitalizeWords = str =>
+      str.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+
+    const capitalizedName = capitalizeWords(name);
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const generateReferralCode = () => {
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let code = 'PRONET-';
+      for (let i = 0; i < 8; i++) {
+        code += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return code;
+    };
+
+    let referralCode;
+    let isUnique = false;
+    while (!isUnique) {
+      referralCode = generateReferralCode();
+      const existingCode = await users.findOne({ user_referral_code: referralCode });
+      if (!existingCode) {
+        isUnique = true;
+      }
+    }
+
+    const data = {
+      name: capitalizedName,
+      email: email,
+      user_address: user_address,
+      password: hashedPassword,
+      referred_by_user_id: referringUser ? referringUser._id : null,
+      phone_no: phone_no,
+      age: age,
+      gender: gender,
+      dob: dob,
+      state: state,
+      city: city,
+      aadhar_no: aadhar_no,
+      user_referral_code: referralCode
+    };
+
+    const response = await userService.createAccount(data);
+
+    if (referringUser) {
+      await users.findByIdAndUpdate(
+        referringUser._id,
+        {
+          $push: { referrals: response._id },
+          $inc: { no_of_direct_referrals: 1 }
+        },
+        { new: true }
+      );
+    }
+
+    const Authorization = jwtTokenService.generateJwtToken({ user_id: response._id, LoggedIn: true });
+    await jwtTokenService.storeRefreshToken(Authorization, response._id);
+
+    const findToken = await refresh.findOne({ user_id: response._id }).select('_id');
+    await users.findByIdAndUpdate(
+      response._id,
+      { $push: { tokens: findToken._id } },
+      { new: true }
+    );
+
+    const updatedUser = await users.findById(response._id);
+    return res.status(200).json({ Status: true, message: 'User registered successfully!', data: updatedUser });
+
+  } catch (err) {
+    console.error(err);
+    if (err.name === 'ValidationError') {
+      const errors = {};
+      for (let field in err.errors) {
+        errors[field] = err.errors[field].message;
+      }
+      return res.status(400).json({ Status: false, message: 'Validation failed!', errors: errors });
+    }
+    return res.status(500).json({ Status: false, message: 'Internal Server Error' });
+  }
+};
+
+//Add direct by User User referal code END
+
 //Get my direct START
 exports.getMyReferrals = async (req, res) => {
   try {
@@ -736,6 +861,82 @@ exports.addFiles = async (req, res) => {
   }
 };
 
+exports.addFilesNew = async (req, res) => {
+  try {
+    const { targetType, rank } = req.body;
+
+    // Collect files
+    const flyersFiles = Array.isArray(req.files?.flyers) ? req.files.flyers : [];
+    const pptFiles = Array.isArray(req.files?.ppt) ? req.files.ppt : [];
+    const videoFiles = Array.isArray(req.files?.video) ? req.files.video : [];
+    const agreementFile = req.files?.agreement?.[0] || null;
+
+    // Get user list based on target type
+    let targetUsers = [];
+
+    if (targetType === 'all') {
+      targetUsers = await users.find({}, '_id');
+    } else if ((targetType === 'rank' || targetType === 'rankAndAbove') && rank) {
+      const RANKS = [
+        "IGINATOR", "SPARK", "RISER", "PIONEER", "INNOVATOR", 
+        "CATALYST", "TRAILBLAZER", "VANGUARD", "LUMINARY", "MOGUL", 
+        "SOVEREIGN", "ZENITH"
+      ];
+      const selectedRankIndex = RANKS.indexOf(rank.toUpperCase());
+
+      if (selectedRankIndex === -1) {
+        return res.status(400).json({ success: false, message: 'Invalid rank name' });
+      }
+
+      // Ranks to search for
+      const validRanks = (targetType === 'rank')
+        ? [RANKS[selectedRankIndex]]
+        : RANKS.slice(selectedRankIndex);
+
+      // Find rank documents with matching rank names
+      const matchingRankDocs = await rankModel.find({
+        user_rank_name: { $in: validRanks }
+      });
+
+      const userIds = matchingRankDocs.map(doc => doc.user.toString());
+
+      // Fetch user details
+      targetUsers = await users.find({ _id: { $in: userIds } }, '_id');
+    } 
+    else {
+      return res.status(400).json({ success: false, message: 'Invalid targetType or missing rank' });
+    }
+
+
+    const fileData = {
+      flyers: flyersFiles.map(file => file.filename),
+      ppt: pptFiles.map(file => file.filename),
+      agreement: agreementFile ? agreementFile.filename : "",
+      video: videoFiles.map(file => file.filename),
+      user: targetUsers.map(u => u._id),
+    };
+
+    // Create single file record
+    const createdFile = await fileModel.create(fileData);
+
+    // Update all target users with the file ID
+    const userIds = targetUsers.map(u => u._id);
+    await users.updateMany(
+      { _id: { $in: userIds } },
+      { $push: { files: createdFile._id } }
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Files uploaded and assigned successfully',
+      data: createdFile
+    });
+  } catch (error) {
+    console.error('Error uploading files:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 //Add files END
 
 //Read file START
@@ -790,7 +991,6 @@ exports.getFile = async (req, res) => {
   }
 };
 //Read file END
-
 
 //Add Binary START
 exports.addBinary = async (req, res) => {
@@ -865,6 +1065,191 @@ exports.addBinary = async (req, res) => {
 
   } catch (error) {
     console.error('Binary placement failed:', error.message);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// exports.addBinaryReferral = async (req, res) => {
+//   try {
+//     const userId = req.params.userId; // You (placing someone)
+//     const { directReferralId, position, parentId } = req.body;
+
+//     if (!userId || !directReferralId || !['left', 'right'].includes(position)) {
+//       return res.status(400).json({ message: 'Invalid input data' });
+//     }
+
+//     // Ensure directReferralId is not already in tree
+//     const existingNode = await BinaryReferral.findOne({ user: directReferralId });
+//     if (existingNode) {
+//       return res.status(400).json({ message: 'This referral is already placed in tree' });
+//     }
+
+//     // Ensure user node (your node) exists
+//     let userNode = await BinaryReferral.findOne({ user: userId });
+//     if (!userNode) {
+//       userNode = await BinaryReferral.create({
+//         user: userId,
+//         left: null,
+//         right: null,
+//         parent: null
+//       });
+//     }
+
+//     // Case 1: You're placing directly under yourself
+//     if (!parentId || parentId === userId) {
+//       if (userNode[position]) {
+//         return res.status(400).json({ message: `Your ${position} side is already occupied` });
+//       }
+
+//       userNode[position] = directReferralId;
+//       await userNode.save();
+
+//       await BinaryReferral.create({
+//         user: directReferralId,
+//         parent: userId,
+//         left: null,
+//         right: null
+//       });
+
+//       return res.status(200).json({
+//         message: `Direct referral placed on your ${position} side`
+//       });
+//     }
+
+//     // Case 2: You're placing under someone else (picked from frontend)
+//     const pickedParentNode = await BinaryReferral.findOne({ user: parentId });
+//     if (!pickedParentNode) {
+//       return res.status(400).json({ message: 'Selected parent ID not found in tree' });
+//     }
+
+//     if (pickedParentNode[position]) {
+//       return res.status(400).json({ message: `Picked parent already has user on ${position} side` });
+//     }
+
+//     pickedParentNode[position] = directReferralId;
+//     await pickedParentNode.save();
+
+//     await BinaryReferral.create({
+//       user: directReferralId,
+//       parent: parentId,
+//       left: null,
+//       right: null
+//     });
+
+//     return res.status(200).json({
+//       message: `Referral placed under ${parentId} on ${position} side`
+//     });
+
+//   } catch (error) {
+//     console.error('Error in binary placement:', error.message);
+//     return res.status(500).json({ message: 'Server error', error: error.message });
+//   }
+// };
+
+
+exports.addBinaryReferral = async (req, res) => {
+  try {
+    const userId = req.params.userId; // You (placing someone)
+    const { directReferralId, position, parentId } = req.body;
+
+    if (!userId || !directReferralId) {
+      return res.status(400).json({ message: 'Invalid input data' });
+    }
+
+    // Ensure user node (your node) exists
+    let userNode = await BinaryReferral.findOne({ user: userId });
+    if (!userNode) {
+      userNode = await BinaryReferral.create({
+        user: userId,
+        left: null,
+        right: null,
+        parent: null
+      });
+    }
+
+    // Handle already placed referral (move logic)
+    let existingNode = await BinaryReferral.findOne({ user: directReferralId });
+    if (existingNode) {
+      const oldParentNode = await BinaryReferral.findOne({ user: existingNode.parent });
+
+      if (oldParentNode) {
+        if (oldParentNode.left?.toString() === directReferralId) {
+          oldParentNode.left = null;
+        } else if (oldParentNode.right?.toString() === directReferralId) {
+          oldParentNode.right = null;
+        }
+        await oldParentNode.save();
+      }
+    } else {
+      // Create node if it doesn't exist
+      existingNode = await BinaryReferral.create({
+        user: directReferralId,
+        parent: null,
+        left: null,
+        right: null
+      });
+    }
+
+    // If placing under self (userId)
+    if (!parentId || parentId === userId) {
+      if (position && !userNode[position]) {
+        userNode[position] = directReferralId;
+        await userNode.save();
+
+        existingNode.parent = userId;
+        await existingNode.save();
+
+        return res.status(200).json({
+          message: `Direct referral placed on your ${position} side`
+        });
+      }
+
+      // Auto-place if both sides full or no position provided
+      const available = await findAvailablePosition(userId);
+      if (!available) {
+        return res.status(400).json({ message: 'No available position in tree' });
+      }
+
+      const { parentId: autoParent, position: autoPos } = available;
+
+      const parentNode = await BinaryReferral.findOne({ user: autoParent });
+      parentNode[autoPos] = directReferralId;
+      await parentNode.save();
+
+      existingNode.parent = autoParent;
+      await existingNode.save();
+
+      return res.status(200).json({
+        message: `Referral auto-placed under ${autoParent} on ${autoPos} side`
+      });
+    }
+
+    // Manual placement under another parent
+    const pickedParentNode = await BinaryReferral.findOne({ user: parentId });
+    if (!pickedParentNode) {
+      return res.status(400).json({ message: 'Selected parent ID not found in tree' });
+    }
+
+    if (!['left', 'right'].includes(position)) {
+      return res.status(400).json({ message: 'Position (left/right) must be specified when parent is picked' });
+    }
+
+    if (pickedParentNode[position]) {
+      return res.status(400).json({ message: `Picked parent already has user on ${position} side` });
+    }
+
+    pickedParentNode[position] = directReferralId;
+    await pickedParentNode.save();
+
+    existingNode.parent = parentId;
+    await existingNode.save();
+
+    return res.status(200).json({
+      message: `Referral manually placed under ${parentId} on ${position} side`
+    });
+
+  } catch (error) {
+    console.error('Error in binary placement:', error.message);
     return res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -958,40 +1343,34 @@ exports.getTicketsByUser = async (req, res) => {
 //Generate e-pin START
 exports.generateEpin = async (req, res) => {
   try {
-    const { numberOfEpins, value, senderUserId, senderType } = req.body;
+    const { numberOfEpins, value, generated_by, generatedByType } = req.body;
 
-    // Helper function defined inside the route handler
-    function generateEpinCode() {
-      return uuidv4().slice(0, 12).toUpperCase(); 
-    }
-
-    // Validate sender (can be either user or admin)
-    let sender = null;
-    if (senderType === 'usermaster') {
-      sender = await users.findById(senderUserId);
-    } else if (senderType === 'admin') {
-      sender = await admins.findById(senderUserId);
+    // Validate creator
+    let creator = null;
+    if (generatedByType === 'usermaster') {
+      creator = await users.findById(generated_by);
+    } else if (generatedByType === 'admin') {
+      creator = await admins.findById(generated_by);
     } else {
-      return res.status(400).json({ message: 'Invalid sender type' });
+      return res.status(400).json({ message: 'Invalid generatedByType' });
     }
 
-    if (!sender) {
-      return res.status(404).json({ message: 'Sender not found' });
+    if (!creator) {
+      return res.status(404).json({ message: 'Creator not found' });
     }
 
-    // Generate and store Epins
     const generatedEpins = [];
 
     for (let i = 0; i < numberOfEpins; i++) {
-      const epinCode = generateEpinCode();
+      const epinCode = uuidv4().slice(0, 12).toUpperCase();
 
       const epin = new Epin({
         epin_codes: [epinCode],
         value,
         status: 'unused',
-        generated_by: sender._id,
-        sender: sender._id,
-        senderType
+        generated_by,
+        generatedByType
+        // No sender or senderType needed here
       });
 
       await epin.save();
@@ -1007,13 +1386,13 @@ exports.generateEpin = async (req, res) => {
     console.error(error);
     return res.status(500).json({ message: 'Server error' });
   }
-}
+};
 //Generate e-pin END
 
 //Transfer e-pin START
 exports.transferEpin = async (req, res) => {
   try {
-    const { epinCodes, senderUserId, senderType, receiverUserId } = req.body;
+    const { epinCodes, senderUserId, senderType, receiverUserId,epin_note } = req.body;
 
     // Validate sender
     let sender = null;
@@ -1049,14 +1428,15 @@ exports.transferEpin = async (req, res) => {
       }
 
       // Update the Epin with sender and receiver details
-      epin.sender = senderUserId;
-      epin.senderType = senderType;
+      //epin.sender = senderUserId;
+      //epin.senderType = senderType;
       epin.receiver = receiverUserId;
 
       // Optionally, mark the Epin as used and update used_by field
-      epin.status = 'used';
-      epin.used_by = receiverUserId;
-      epin.used_at = new Date();
+      epin.status = ['transferred','unused'];
+     // epin.used_by = receiverUserId;
+      //epin.used_at = new Date();
+      epin.epin_note = epin_note || ' ';
 
       // Save the updated Epin
       await epin.save();
@@ -1069,3 +1449,130 @@ exports.transferEpin = async (req, res) => {
   }
 };
 //Transfer e-pin END
+
+//Delete epin START
+exports.deleteEpin = async (req, res) =>{
+    try {
+        let { epin_id } = req.params
+        let data = await userService.findAndDeleteEpin(epin_id)
+        if (data) {
+            console.log("Delete User Data ", data)
+            return res.status(200).json({ Status: true, message: 'Epin delete successfully', data })
+        } else {
+            return res.status(404).send({ Status: false, message: 'Epin Not Found' })
+        }
+    } catch (err) {
+        console.log("Delete account error", err);
+        return res.status(400).json({ Status: false, message: 'sorry! somthing went wrong' })
+    }  
+}
+//Delete epin END
+
+//Get epin by user id START
+exports.GetEpinsByUserId = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const epins = await Epin.find({
+      $or: [
+        { generated_by: userId },
+        { receiver: userId }
+      ]
+    });
+
+    if (!epins || epins.length === 0) {
+      return res.status(404).json({ message: "No epins found for this user." });
+    }
+
+    const formatted = epins.map(epin => {
+      let userType;
+      let status;
+
+      if (epin.receiver && epin.receiver.toString() === userId) {
+        userType = 'receiver';
+        status = epin.status[1] || epin.status[0];  // show second status if exists
+      } else {
+        userType = 'generated_by';
+        status = epin.status[0];  // show first status
+      }
+
+      return {
+        epin_codes: epin.epin_codes,
+        value: epin.value,
+        note: epin.note,
+        status, // this is now a string, not an array
+        userType,
+        generated_at: epin.generated_at,
+        used_at: epin.used_at
+      };
+    });
+
+    res.status(200).json(formatted);
+
+  } catch (error) {
+    console.error("GetEpinsByUserId Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+//Get epin by user id END
+
+//Get all epin START
+exports.GetAllEpinsGroupedByUser = async (req, res) => {
+  try {
+    const epins = await Epin.find().lean();
+
+    if (!epins || epins.length === 0) {
+      return res.status(404).json({ message: "No epins found." });
+    }
+
+    const groupedByUser = {};
+
+    epins.forEach(epin => {
+      const generatedById = epin.generated_by?.toString();
+      const receiverId = epin.receiver?.toString();
+
+      // Group for generator
+      if (generatedById) {
+        if (!groupedByUser[generatedById]) {
+          groupedByUser[generatedById] = [];
+        }
+
+        groupedByUser[generatedById].push({
+          epin_codes: epin.epin_codes,
+          value: epin.value,
+          note: epin.note,
+          status: epin.status[0], // Show status from generator's point of view
+          userType: 'generated_by',
+          generated_at: epin.generated_at,
+          used_at: epin.used_at
+        });
+      }
+
+      // Group for receiver if transferred
+      if (receiverId) {
+        if (!groupedByUser[receiverId]) {
+          groupedByUser[receiverId] = [];
+        }
+
+        groupedByUser[receiverId].push({
+          epin_codes: epin.epin_codes,
+          value: epin.value,
+          note: epin.note,
+          status: epin.status[1] || epin.status[0], // Show second status for receiver
+          userType: 'receiver',
+          generated_at: epin.generated_at,
+          used_at: epin.used_at
+        });
+      }
+    });
+
+    res.status(200).json(groupedByUser);
+
+  } catch (error) {
+    console.error("GetAllEpinsGroupedByUser Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+//Get all epin END
+
+

@@ -11,6 +11,8 @@ const {uploadUserProfile} = require('../middleware/user-profile-img');
 route.post('/userRegistration',userController.userRegistration);
 //Add direct//User
 route.post('/addNewMember',VerifyJwtToken,userController.addNewMember);
+//Add direct//by User referal code
+route.post('/addNewMemberWithCode',userController.addNewMemberWithCode);
 
 //Login user
 route.post('/loginUser',userController.loginUser);
@@ -32,7 +34,6 @@ route.get('/searchUser',VerifyJwtToken,userController.searchUser);
 route.post('/addWallet/:user_id',VerifyJwtToken,userController.addWallet);
 //Update wallet
 route.put('/updateWallet/:walletId',VerifyJwtToken,userController.updateWallet);
-
 //Get my direct
 route.get('/getMyReferrals/:userId',VerifyJwtToken,userController.getMyReferrals);
 
@@ -41,32 +42,40 @@ route.patch('/addFiles/:userId',VerifyJwtToken,
                         uploadFile.fields([{ name: 'flyers', maxCount: 100 },
                                            { name: 'ppt', maxCount: 100 },
                                            { name: 'video', maxCount: 100 },
-                                           { name: 'agreement', maxCount: 1 }
-                                          
-                                        ]),
-                                                              
+                                           { name: 'agreement', maxCount: 1 }                                         
+                                        ]),                                                             
                        // uploadVideo.fields([{ name: 'video', maxCount: 10 }]),
                         userController.addFiles);
-
-                       
+//add files (flyers/ppt/agreement/Video) all /rank and above
+route.patch('/addFilesNew', VerifyJwtToken, 
+   uploadFile.fields([
+       { name: 'flyers', maxCount: 100 },
+       { name: 'ppt', maxCount: 100 },
+       { name: 'video', maxCount: 100 },
+       { name: 'agreement', maxCount: 1 }
+   ]),
+   userController.addFilesNew
+);                       
 //Read file
 route.get('/getFile/:filename',VerifyJwtToken,userController.getFile);
-
 //Add binary
 route.post('/addBinary',userController.addBinary);
+route.post('/addBinaryNew/:userId',userController.addBinaryReferral);//new
 //Get binary
-route.post('/getBinaryByUser/:userId',userController.getBinaryByUser);
-
+route.post('/getBinaryByUser/:userId',VerifyJwtToken,userController.getBinaryByUser);
 //Raise Ticket
 route.post('/raiseTicket',userController.raiseTicket);
 //Get ticket of a user
 route.get('/getTicketsByUser/:userId',userController.getTicketsByUser);
-
 //Generate e-pin
 route.post('/generateEpin',userController.generateEpin);
 //Transfer e-pin
 route.post('/transferEpin',userController.transferEpin);
-
-
+//Delete epin
+route.delete('/deleteEpin/:epin_id',userController.deleteEpin);
+//Get epin by user id
+route.get('/GetEpinsByUserId/:userId',userController.GetEpinsByUserId);
+//Get all epin
+route.get('/GetAllEpinsGroupedByUser',userController.GetAllEpinsGroupedByUser);
 
 module.exports = route; 

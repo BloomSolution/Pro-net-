@@ -1,6 +1,7 @@
 const users = require('../user/user-model');
 const wallet = require('../models/user-wallet-model');
 const tokenService = require('./jwt-service');
+const epin =require('../models/epin-model')
 
 class userServie {
 
@@ -88,6 +89,16 @@ async findAndDeleteUserAccount(id) {
     }
 }
 //find and delete user account END
+
+//find and delete epin START
+async findAndDeleteEpin(id) {
+    try {
+    return await epin.findByIdAndDelete(id, { $set: { active: false } }, { new: true })
+    } catch (err) {
+    throw err
+    }
+}
+//find and delete epin END
 
 // Create user wallet SRART
 async createUserWallet(data) {

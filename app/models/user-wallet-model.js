@@ -15,6 +15,10 @@ const walletSchema = new mongoose.Schema({
   crypto_network: String,  // e.g., TRC20, ERC20, BEP20
   crypto_type: String,     // e.g., USDT, BTC, ETH
 
+  binaryBonus: {
+    type: Number,
+    default: 0
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('wallet', walletSchema, 'wallets');

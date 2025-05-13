@@ -161,10 +161,20 @@ const userSchema = new Schema({
         default:null,
         ref: 'file'
     }],
-    epins:[{
+    // epins:[{
+    //     type: mongoose.Schema.Types.ObjectId,
+    //     default:null,
+    //     ref: 'epin' 
+    // }],
+    rank:{
         type: mongoose.Schema.Types.ObjectId,
         default:null,
-        ref: 'epin' 
+        ref: 'rank'
+    },
+    news:[{
+        type: mongoose.Schema.Types.ObjectId,
+        default:null,
+        ref:'news'
     }]
 }, { timestamps: true })
 

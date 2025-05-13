@@ -2,10 +2,15 @@ const express = require('express');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const dbconnection = require('./config/db'); 
+
+const DBconnection = require('./config/db-en'); 
+
 const socketIo = require('socket.io');
 const http = require('http');  // Import http to create the server
 const path = require('path');  // Required for path module
 const MessageModel = require('./app/models/chat');
+require('./app/user/weekly-bonus');
+
 
 // Config
 dotenv.config();
@@ -15,7 +20,11 @@ const corsOptions = {
     origin: function (origin, callback) {
         const allowedOrigins = [
             'http://localhost:3000',  
-            'https://jointogainnew.vercel.app'
+            'http://localhost:5173', 
+            'http://localhost:5175',
+            'https://jointogainnew.vercel.app',
+            'https://pronetuserdashboard.vercel.app',
+            '*'
         ];
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
@@ -36,6 +45,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Connect Database
 dbconnection()
+//DBconnection()
 
 // Router setup (assuming you have a router file)
 const router = require('./router');

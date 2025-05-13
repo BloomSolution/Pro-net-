@@ -11,8 +11,8 @@ const connectDB = async () => {
     await mongoose.connect(uri, {
       tls: true,
       tlsCAFile: caPath, 
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      //useNewUrlParser: true,
+      //useUnifiedTopology: true,
     });
 
     console.log('Connected to MongoDB (EvenNode)');

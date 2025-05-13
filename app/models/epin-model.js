@@ -5,37 +5,41 @@ const epinSchema = new Schema({
   epin_codes: [{ 
     type: String, 
     required: true, 
-    unique: true 
+    //unique: true 
   }],
   value: { 
     type: Number, 
-    required: true 
+    required: 0 
   }, 
-  status: { 
+  epin_note:{
     type: String, 
-    enum: ['unused', 'used'], 
-    default: 'unused' 
+    default: " " 
   },
+  status: [{ 
+    type: String, 
+    enum: ['unused', 'used','transferred'], 
+    default: 'unused' 
+  }],
   generated_by: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'generatedByType',  // Reference to the user who generated the Epin (could be admin or user)
-    required: true 
+    required: null 
   },
   generatedByType :{
     type: String,
     enum: ['usermaster', 'admin'],  
-    required: true
+    required: null
   },
-  sender: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    refPath: 'senderType', // Dynamically reference the sender (can be 'usermaster' or 'admin')
-    required: true
-  },
-  senderType: {
-    type: String,
-    enum: ['usermaster', 'admin'],  // 'usermaster' or 'admin' as the sender type
-    required: true
-  },
+  // sender: { 
+  //   type: mongoose.Schema.Types.ObjectId, 
+  //   refPath: 'senderType', // Dynamically reference the sender (can be 'usermaster' or 'admin')
+  //   required: null
+  // },
+  // senderType: {
+  //   type: String,
+  //   enum: ['usermaster', 'admin'],  // 'usermaster' or 'admin' as the sender type
+  //   required: null
+  // },
   receiver: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'usermaster',  // Reference to the receiver of the Epin
